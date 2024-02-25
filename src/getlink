@@ -1,0 +1,43 @@
+#!/usr/bin/env python3
+
+"""
+Gets the Gradescope URL for a particular student for a particular assignment.
+
+For more information - view staff-bin/hitme/README.md.
+
+Chami Lamelas
+Summer 2023
+"""
+
+from hitme import HitMeDatabase, HitMeColumn, HitMeException
+import misc
+from hitmeconfig import get_assignment
+
+DESCRIPTION = """
+Use this script to get the Gradescope URL for a particular student.
+
+This is useful if you lost the URL from hitme, or if you are taking a student from 
+another TA.
+"""
+
+if __name__ == "__main__":
+    student = misc.get_one_argument(
+        "student",
+        "Student email (for multiple students, separate emails by a comma with no space)",
+        misc.help(DESCRIPTION),
+        misc.lower,
+    )
+    try:
+        assignment = get_assignment()
+        db = HitMeDatabase(assignment)
+        db.load()
+        misc.green(
+            db.get(
+                HitMeColumn.STUDENT_IDS,
+                student,
+                HitMeColumn.GRADESCOPE_URL,
+                empty_error=f"There is no entry for {student} in HitMe database for {assignment}.",
+            )[0]
+        )
+    except HitMeException as e:
+        misc.red(str(e))

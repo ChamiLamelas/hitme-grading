@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+
+"""
+Wipes grading backup and hitme database for an assignment.
+This can be thought of as the opposite of setup.py.
+
+This is called remotely by reset_assignment. Now, this 
+script is only deleting files. It's not making any files
+that we want to have certain ownership (like setup does).
+Thus, for this script, we don't have to do any of the
+fancy SUID bit stuff we need for setup. We just run this
+file with the TAs permissions who have write (delete)
+access anyway to these files as they are members of ta15.
+
+Chami Lamelas
+Spring 2024
+"""
+
+import shutil
+import hitme
+import setup
+import misc
+import sys
+import os
+
+
+def _confirm_overwrite(assignment):
+    """
+    Has user confirm they want to delete the grading backup and
+    HitMe on file database for an assignment.
+    """
+
+    misc.yellow(f"Hitme has been set up for {assignment}. Grading may have begun.")
+    text = "Are you sure you would like to reset hitme (and delete the backup)? (y/n)"
+    confirmation = misc.prompt(text)
+    while confirmation not in {"y", "n"}:
+        confirmation = misc.prompt(text)
+    return confirmation == "y"
+
+
+def main():
+    # We don't use argparse, because this is passed via reset_assignment
+    # which does argument parsing. We know this will be the assignment
+    assignment = sys.argv[1]
+
+    # Collect the files to delete to reset hitme and the backup - the
+    # 3 files related to the hitme database and then the backup folder
+    files = [
+        hitme.get_db_path(assignment),
+        hitme.get_lock_path(assignment),
+        hitme.get_log_path(assignment),
+        setup.get_backup_folder(assignment),
+    ]
+
+    # Check if a database actually has been setup, if not, nothing to do!
+    if not os.path.isfile(files[0]):
+        misc.blue(f"HitMe has not been setup for {assignment} - nothing to do.")
+        return
+
+    # Make sure they actually want to delete - if so, do the deletions
+    if _confirm_overwrite(assignment):
+        for file in files:
+            if os.path.isfile(file):
+                os.remove(file)
+            elif os.path.isdir(file):
+                shutil.rmtree(file)
+        misc.green(f"HitMe and backup reset successfully for {assignment}")
+    else:
+        misc.green(f"HitMe reset cancelled")
+
+
+if __name__ == "__main__":
+    main()

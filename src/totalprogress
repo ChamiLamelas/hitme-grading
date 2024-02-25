@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+
+"""
+Allows a TF to view the overall grading progress for each TA for the whole semester.
+
+For more information - view staff-bin/hitme/README.md.
+
+Liam Drew
+Spring 2024
+"""
+
+import os
+import hitme
+from collections import Counter
+import misc
+import hitmeconfig
+
+
+DESCRIPTION = """
+Use this script to view the total grading progress for all TAs this semester.
+"""
+
+if __name__ == "__main__":
+    try:
+        misc.check_no_arguments(misc.help(DESCRIPTION))
+        hitmeconfig.check_user_is_super_user()
+
+        all_progress = Counter()
+
+        for entry in os.scandir(hitme.HITME_DATABASE_FOLDER):
+            if entry.name.endswith("pkl"):
+                assignment = entry.name.split(".")[0]
+                db = hitme.HitMeDatabase(assignment)
+                db.load()
+                progress = db.groupby(
+                    hitme.HitMeColumn.GRADER, hitme.HitMeColumn.STATUS
+                )
+
+                # Counts the number of complete assignments for the grader
+                # Example:
+                #   progess = { "wdrew02": [HitMeStatus.IN_PROGRESS, HitMeStatus.COMPLETE]}
+                # This loop adds 1 to all_progess["wdrew02"]
+                for k in progress:
+                    all_progress[k] += progress[k].count(hitme.HitMeStatus.COMPLETE)
+
+        for grader, grader_progress in sorted(all_progress.items(), key=lambda e: e[0]):
+            # Prints something like:
+            # slamel01      1 Complete
+
+            # Stole this from viewprogress -- see there
+            misc.blue(grader.ljust(16), end="")
+
+            misc.green(grader_progress, end=" ")
+            print("Complete")
+    except hitme.HitMeException as e:
+        misc.red(str(e))

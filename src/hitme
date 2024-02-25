@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+
+"""
+Assigns a random student to a TA.
+
+For more information - view staff-bin/hitme/README.md.
+
+Chami Lamelas
+Summer 2023
+"""
+
+from hitme import HitMeColumn, HitMeDatabase, HitMeStatus, HitMeException
+import misc
+import getpass
+from hitmeconfig import get_assignment
+import os 
+
+DESCRIPTION = """
+Run this script to be assigned a random student.
+"""
+
+if __name__ == "__main__":
+    misc.check_no_arguments(misc.help(DESCRIPTION))
+    db = None
+    try:
+        assignment = get_assignment()
+        db = HitMeDatabase(assignment, os.path.basename(__file__))
+        db.acquire_writelock()
+        db.load()
+        row = db.get(
+            HitMeColumn.STATUS,
+            HitMeStatus.NOT_STARTED,
+            [
+                HitMeColumn.STUDENT_NAMES,
+                HitMeColumn.STUDENT_IDS,
+                HitMeColumn.GRADESCOPE_URL,
+            ],
+            limit=1,
+            empty_error=f"There are no unassigned students for {db.assignment}",
+        )[0]
+        db.set(
+            HitMeColumn.STUDENT_IDS,
+            row[HitMeColumn.STUDENT_IDS],
+            [HitMeColumn.STATUS, HitMeColumn.GRADER],
+            [HitMeStatus.IN_PROGRESS, getpass.getuser()],
+        )
+        misc.green(
+            f"You were assigned to grade {row[HitMeColumn.STUDENT_NAMES]} ({row[HitMeColumn.STUDENT_IDS]}) for {assignment}:\n{row[HitMeColumn.GRADESCOPE_URL]}"
+        )
+    except HitMeException as e:
+        misc.red(str(e))
+    finally:
+        if db is not None:
+            db.release_writelock()

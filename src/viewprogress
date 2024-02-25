@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+
+"""
+Allows a TF (or TA) to view the overall progress of grading an assignment via the log.
+
+For more information - view staff-bin/hitme/README.md.
+
+Chami Lamelas
+Summer 2023 - Present
+"""
+
+from hitme import HitMeStatus, HitMeColumn, HitMeDatabase, HitMeException
+import misc
+import getpass
+from hitmeconfig import get_assignment, check_user_is_super_user
+from collections import defaultdict, Counter
+
+DESCRIPTION = """
+Use this script to view the overall grading progress for an assignment.
+
+As an additional bonus, it will give more detailed grading progress for the TA who runs it.
+This way, it can be additionally used to determine who you have in progress have completed.
+"""
+
+
+if __name__ == "__main__":
+    try:
+        misc.check_no_arguments(misc.help(DESCRIPTION))
+
+        # What's printed as the description for total submission count
+        TOTAL_SUBMISSIONS = "Total Submissions"
+
+        # Print (color) functions used for each of the different things
+        # we print (statuses, total submissions)
+        PRINTERS = {
+            TOTAL_SUBMISSIONS: misc.blue,
+            HitMeStatus.NOT_STARTED: misc.red,
+            HitMeStatus.IN_PROGRESS: misc.yellow,
+            HitMeStatus.COMPLETE: misc.green,
+        }
+
+        assignment = get_assignment()
+        user = getpass.getuser()
+        db = HitMeDatabase(assignment)
+        db.load()
+
+        # Gets a dictionary mapping status -> count of status for each of the 3 statuses
+        total_progress_breakdown = db.groupby(
+            HitMeColumn.STATUS, HitMeColumn.STUDENT_NAMES, len
+        )
+
+        # Get the total number of submissions by summing counts of all the statuses,
+        # then add it to the total_progress_breakdown so it gets printed below
+        total_progress_breakdown[TOTAL_SUBMISSIONS] = sum(
+            total_progress_breakdown.values()
+        )
+
+        # Prints total grading progress nicely with total submissions
+        # in blue, red count for not started, yellow count for in
+        # progress, and green for complete (in that order b/c that's
+        # how PRINTERS was initialized and that's what we iterate over)
+        misc.separator(f"Total Grading Progress for {assignment}")
+        for key, printer in PRINTERS.items():
+
+            # We query total_progress_breakdown to get the actual count,
+            # hence why we put all the status counts and the total count here
+            printer(total_progress_breakdown.get(key, 0), end="\t")
+            print(key)
+
+        # Get status, student emails for each student graded by user
+        ta_rows = db.get(
+            HitMeColumn.GRADER, user, [HitMeColumn.STATUS, HitMeColumn.STUDENT_IDS]
+        )
+
+        # Convert list of 2-dicts into dict keyed on status, e.g.
+        # [
+        #   { HitMeColumn.STATUS: HitMeStatus.IN_PROGRESS,
+        #     HitMeColumn.STUDENT_IDS: "bob@tufts.edu" },
+        #   { HitMeColumn.STATUS: HitMeStatus.COMPLETE,
+        #     HitMeColumn.STUDENT_IDS: "alice@tufts.edu" },
+        # ]
+        # ->
+        # {
+        #   HitMeStatus.IN_PROGRESS: [ "bob@tufts.edu", ... ],
+        #   HitMeStatus.COMPLETE: [ "alice@tufts.edu", ... ]
+        # }
+        ta_progress = {
+            s: [
+                e[HitMeColumn.STUDENT_IDS]
+                for e in filter(lambda e: e[HitMeColumn.STATUS] == s, ta_rows)
+            ]
+            for s in HitMeStatus
+        }
+
+        # Prints TA's progress nicely with their completed count in
+        # green, followed by completed emails (sorted), their in progress
+        # count in yellow, followed by in progress emails (sorted)
+        misc.separator(f"Your Progress for {assignment}")
+        for status in [HitMeStatus.COMPLETE, HitMeStatus.IN_PROGRESS]:
+            PRINTERS[status](f"{len(ta_progress[status])} {status}:")
+            for e in sorted(ta_progress[status]):
+                print(f"\t{e}")
+            print()
+
+        if check_user_is_super_user(error=False):
+            # This is a dict[2-tuple, int] (e.g.
+            # ("slamel01", HitMeStatus.IN_PROGRESS): 1)
+            flat_ta_breakdown = db.groupby(
+                [HitMeColumn.GRADER, HitMeColumn.STATUS], HitMeColumn.STUDENT_IDS, len
+            )
+
+            # Converts into a dict[str, Counter[str]] (e.g.
+            # "slamel01": { HitMeStatus.IN_PROGRESS: 1 })
+            # Note: ta_breakdown[USER][STATUS] will always return
+            # something (0 by default, in case a TA has no completed
+            # students)
+            ta_breakdown = defaultdict(Counter)
+            for (grader, status), count in flat_ta_breakdown.items():
+                ta_breakdown[grader][status] = count
+
+            # Prints each TA's progress with TA names in blue followed
+            # by their complete count in green and in progress count
+            # in yellow
+            misc.separator(f"Progress per TA for {assignment}")
+            for grader, grader_progress in ta_breakdown.items():
+
+                # Prints something like:
+                # slamel01      1 Complete, 2 In Progress
+                # slamel01 would be blue, 1 would be green, 2 would be yellow
+
+                # ljust pads with spaces, so there will always be 16 characters
+                # before the complete count: https://stackoverflow.com/a/5676676
+                misc.blue(grader.ljust(16), end="")
+                for status, end in zip(
+                    [HitMeStatus.COMPLETE, HitMeStatus.IN_PROGRESS], [", ", "\n"]
+                ):
+                    PRINTERS[status](grader_progress[status], end=" ")
+                    print(status, end=end)
+
+    except HitMeException as e:
+        misc.red(str(e))

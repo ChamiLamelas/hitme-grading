@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+
+"""
+Allows a TA to mark that they have completed grading a student.
+
+For more information - view staff-bin/hitme/README.md.
+
+Chami Lamelas
+Summer 2023
+"""
+
+import misc
+import getpass
+from hitme import HitMeColumn, HitMeDatabase, HitMeStatus, HitMeException
+from hitmeconfig import get_assignment
+import os 
+
+DESCRIPTION = """
+Use this script to mark that you have completed grading a student.
+
+Note this action is reversible with markundone.
+"""
+
+if __name__ == "__main__":
+    student = misc.get_one_argument(
+        "student",
+        "Student email (for multiple students, separate emails by a comma with no space)",
+        misc.help(DESCRIPTION),
+        misc.lower
+    )
+    db = None
+    try:
+        assignment = get_assignment()
+        db = HitMeDatabase(assignment, os.path.basename(__file__))
+        db.acquire_writelock()
+        db.load()
+        db.set(
+            HitMeColumn.STUDENT_IDS,
+            student,
+            [HitMeColumn.GRADER, HitMeColumn.STATUS],
+            [getpass.getuser(), HitMeStatus.COMPLETE],
+            empty_error=f"There is no entry for {student} in HitMe database for {assignment}.",
+        )
+        misc.green(
+            f"You marked that the grading for {student} for {assignment} is finished."
+        )
+    except HitMeException as e:
+        misc.red(str(e))
+    finally:
+        if db is not None:
+            db.release_writelock()

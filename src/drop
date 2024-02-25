@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+
+"""
+Drops a student -- i.e. the TA is no longer assigned to them.
+
+For more information - view staff-bin/hitme/README.md.
+
+Annika Tanner
+Fall 2023
+"""
+
+from hitme import HitMeDatabase, HitMeColumn, hitmeassert, HitMeStatus, HitMeException
+import misc
+import getpass
+from hitmeconfig import get_assignment
+import os 
+
+DESCRIPTION = """
+Run this script to drop a student.
+
+- You need to have been assigned the student by hitme (so check
+  viewprogress).
+"""
+
+if __name__ == "__main__":
+    student = misc.get_one_argument(
+        "student",
+        "Student email (for multiple students, separate emails by a comma with no space)",
+        misc.help(DESCRIPTION),
+        misc.lower
+    )
+    user = getpass.getuser()
+    db = None
+    try:
+        assignment = get_assignment()
+        db = HitMeDatabase(assignment, os.path.basename(__file__))
+        db.acquire_writelock()
+        db.load()
+
+        # TAs can only drop students they are assigned
+        # who have not been marked done
+        row = db.get(
+            HitMeColumn.STUDENT_IDS,
+            student,
+            [HitMeColumn.GRADER, HitMeColumn.STATUS],
+            empty_error=f"There is no entry for {student} in HitMe database for {assignment}.",
+        )[0]
+        hitmeassert(
+            row[HitMeColumn.GRADER] == user,
+            f"{user} is not the assigned grader of {student}.",
+        )
+        hitmeassert(
+            row[HitMeColumn.STATUS] != HitMeStatus.COMPLETE,
+            f"{student} has already been marked done.",
+        )
+
+        db.set(
+            HitMeColumn.STUDENT_IDS,
+            student,
+            [HitMeColumn.GRADER, HitMeColumn.STATUS],
+            [None, HitMeStatus.NOT_STARTED],
+        )
+
+        misc.green(f"You are no longer assigned {student}.")
+    except HitMeException as e:
+        misc.red(str(e))
+    finally:
+        if db is not None:
+            db.release_writelock()

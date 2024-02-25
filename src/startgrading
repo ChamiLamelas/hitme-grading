@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+
+"""
+Sets up a TA to start grading a particular assignment (so they can use
+hitme, markdone, etc.)
+
+For more information - view staff-bin/hitme/README.md.
+
+Chami Lamelas
+Summer 2023
+"""
+
+from hitmeconfig import set_assignment
+from hitme import HitMeException
+import misc
+
+DESCRIPTION = """
+Run this script to start the grading process. 
+
+All calls to:
+    hitme
+    swap
+    viewprogress
+    markdone
+    markundone
+    getlink
+
+Will be applied to whatever assignment you pass in here.
+
+You can change your current assignment at any time, but make sure
+to do so before calling any of the above.
+"""
+
+if __name__ == "__main__":
+    assignment = misc.get_one_argument(
+        "assignment", "Gradescope assignment name", misc.help(DESCRIPTION)
+    )
+    try:
+        set_assignment(assignment)
+        misc.green(f"Your current hitme assignment has been set to: {assignment}.")
+    except HitMeException as e:
+        misc.red(str(e))

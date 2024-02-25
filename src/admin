@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+
+"""
+Allows a super user to manually access the grader and status for a
+student. This involves some understanding of the hitme system 
+as to how you should set the status and grader. For example, a grader 
+should be the UTLN of a staff member, but this is not checked.
+
+See staff-bin/hitme/README.md for more information on that. 
+
+Make sure you know what you want to do before running this command!
+
+Chami Lamelas
+Spring 2024
+"""
+
+import hitmeconfig
+import argparse
+import hitme
+import misc
+import os 
+
+
+DESCRIPTION = """
+Allows you to modify the hitme database with --set. In particular, 
+make the same modifications the other hitme commands perform. 
+
+At a high level: 
+    admin --set john.smith@tufts.edu slamel01 1
+        This is equivalent to slamel01 getting assigned
+        john.smith@tufts.edu via hitme or swap or if they
+        were to run markundone john.smith@tufts.edu.
+    admin --set john.smith@tufts.edu slamel01 3
+        This is equivalent to slamel01 running markdone
+        john.smith@tufts.edu. 
+    admin --set john.smith@tufts.edu none 2
+        This is equivalent to putting john.smith@tufts.edu
+        back to noone being assigned (e.g. if someone
+        drop or swapped them).
+
+For a full list of the status codes: 
+    Pass in 1 to put someone in progress
+    Pass in 2 to put someone as not started
+    Pass in 3 to put someone as complete 
+
+You can also access grader and status values for a student with --get. 
+"""
+
+EPILOG = """
+For more information on how to set statuses and the grader see
+staff-bin/hitme/README.md. 
+
+Make sure you know what you want to do before running this command!
+"""
+
+
+def check_grader_none(grader):
+    """
+    If user typed something akin to none, returns None (the Python
+    type). Otherwise, grader is left untouched.
+    """
+
+    return None if grader.lower() == "none" else grader
+
+
+def str_to_hitmestatus(status):
+    """
+    Converts a status specified as a string into a HitMeStatus
+    object. Converts a str -> int -> HitMeStatus. If this fails,
+    a HitMeException is raised to signal --set should abort.
+    """
+
+    try:
+        return hitme.HitMeStatus(int(status))
+    except ValueError:
+        # Error reports the allowed status values you are allowed
+        # to enter -- basically, an int can be turned into the Enum
+        # by like keying the Enum via the constructor above
+        error = [
+            f"Unable to parse valid status from {status}. Valid status values are:"
+        ] + [f"\t{e.value} -- {e}" for e in hitme.HitMeStatus]
+        raise hitme.HitMeException("\n".join(error))
+
+
+def handle_set(ids, grader, status):
+    """Handles the --set command given its arguments."""
+
+    db = None
+    try:
+        # Convert grader to None if a none like string was
+        # passed, otherwise leave the same
+        grader = check_grader_none(grader)
+
+        # Convert status to a HitMeStatus as that's what our
+        # database works with
+        status = str_to_hitmestatus(status)
+
+        # Initialize database as in most of the other files
+        # that access the database
+        assignment = hitmeconfig.get_assignment()
+        db = hitme.HitMeDatabase(assignment, os.path.basename(__file__))
+
+        # We're going to write, so we get the lock, load
+        # fresh version and then set based on user parameters
+        # (no checks)
+        db.acquire_writelock()
+        db.load()
+
+        # Set based on user parameters (now verified)
+        db.set(
+            hitme.HitMeColumn.STUDENT_IDS,
+            ids,
+            [hitme.HitMeColumn.GRADER, hitme.HitMeColumn.STATUS],
+            [grader, status],
+            empty_error=f"There is no entry for {ids} in HitMe database for {assignment}.",
+        )
+        misc.green(
+            f"Updated grader to {grader} and status to {status} for {ids} for {assignment}."
+        )
+    except hitme.HitMeException as e:
+        misc.red(str(e))
+    finally:
+        if db is not None:
+            db.release_writelock()
+
+
+def handle_get(ids):
+    """Handles the --get command given its argument"""
+
+    db = None
+    try:
+        # Initialize database as in most of the other files
+        # that access the database
+        assignment = hitmeconfig.get_assignment()
+        db = hitme.HitMeDatabase(assignment)
+
+        # Load fresh version and get -- may be stale, doesn't
+        # really matter
+        db.load()
+        result = db.get(
+            hitme.HitMeColumn.STUDENT_IDS,
+            ids,
+            [hitme.HitMeColumn.GRADER, hitme.HitMeColumn.STATUS],
+            empty_error=f"There is no entry for {ids} in HitMe database for {assignment}.",
+        )[0]
+
+        grader = result[hitme.HitMeColumn.GRADER]
+        status = result[hitme.HitMeColumn.STATUS]
+
+        misc.green(
+            f"Grader is {grader} and status is {status} for {ids} for {assignment}."
+        )
+    except hitme.HitMeException as e:
+        misc.red(str(e))
+
+
+def get_args():
+    """Sets up and gets the command line arguments"""
+
+    parser = argparse.ArgumentParser(
+        description=DESCRIPTION, 
+        formatter_class=argparse.RawDescriptionHelpFormatter, 
+        epilog=EPILOG
+    )
+
+    # A "mutually exclusive group" is one that either parameter
+    # must be passed, but not both
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument(
+        "--set",
+        nargs=3,
+        type=str,
+        metavar=("ids", "grader", "status"),
+        help="Sets the grader and status for a student with provided ID (email).",
+    )
+    group.add_argument(
+        "--get",
+        metavar=("ids",),
+        type=str,
+        help="Gives you the grader and status for a student with provided ID (email).",
+    )
+    return parser.parse_args()
+
+
+def main():
+    hitmeconfig.check_user_is_super_user()
+    args = get_args()
+    if args.set is not None:
+        handle_set(*args.set)
+    else:
+        handle_get(args.get)
+
+
+if __name__ == "__main__":
+    main()
