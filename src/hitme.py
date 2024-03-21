@@ -14,7 +14,6 @@ from filelock import FileLock
 from datetime import datetime
 import pandas as pd
 import getpass
-from pathlib import Path
 import stat
 import random
 
@@ -38,7 +37,7 @@ def _set_file_permissions(filepath):
     Execute is necessary for directories in order to cd into them
     """
 
-    filemask = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IWGRP
+    filemask = stat.S_IRWXU | stat.S_IRGRP | stat.S_IWGRP
     if os.path.isdir(filepath):
         os.chmod(filepath, filemask | stat.S_IXGRP)
     elif os.path.isfile(filepath):
@@ -154,6 +153,86 @@ class HitMeStatus(Enum):
         return self.value
 
 
+class HitMeWriteLogger:
+    """
+    This class is a logger used by HitMeDatabase to log all
+    write (modification) operations to a file. This provides
+    log operations corresponding to the 2 write operations
+    listed above as well as when initializing the database.
+
+    Log file is HITME_DATABASE_FOLDER/assignment.log.
+    """
+
+    def __init__(self, assignment, script):
+        self.assignment = assignment
+        self.script = script
+
+    def _log_message(self, message):
+        """Helper function that logs a message with user and timestamp"""
+
+        # Prefix message with datetime and user
+        log_message = (
+            f"{datetime.now().strftime('%Y-%m-%d %I:%M:%S %p')} : {getpass.getuser()}"
+        )
+
+        # Add script name if one was provided to wrapping database
+        if self.script is not None:
+            log_message += f" running {self.script}"
+
+        # Add message and write - always append to file
+        log_message += f" : {message}\n"
+        with open(get_log_path(self.assignment), "a+") as f:
+            f.write(log_message)
+
+    def log_init(self):
+        """Logs the initialization of a database, setting log file perms if it doesn't exist"""
+
+        self._log_message("initialized database")
+        set_hitme_permissions(get_log_path(self.assignment))
+
+    def log_reset(self):
+        """Logs the resetting of a database"""
+
+        self._log_message("reset database")
+
+    def log_set(self, where_col, where_key, update_cols, update_values):
+        """
+        Logs information about a HitMeDatabase::set( ) operation.
+
+        Parameters:
+            where_col: str
+                Column to check for match
+
+            where_key: Any
+                Rows where row[where_col] = where_key will be updated
+
+            update_cols: str or list[str]
+                row[update_cols] will be updated for matching rows
+
+            update_values: Any or list[Any]
+                row[update_cols] will be updated to update_values for matching rows
+        """
+
+        settings = ", ".join(
+            f"{uc} to {uv}" for uc, uv in zip(update_cols, update_values)
+        )
+        self._log_message(f"set {settings} where {where_col} is {where_key}")
+
+    def log_update(self, *rows):
+        """
+        Logs information about an HitMeDatabase::update( ) operation.
+
+        Parameters:
+            rows: list[dict[HitMeColumn, Any]]
+                Rows to add to the database formatted in the same
+                    manner as HitMeDatabase::update( ).
+        """
+
+        for row in rows:
+            settings = ", ".join(f"{k} = {v}" for k, v in row.items())
+            self._log_message(f"added new row with {settings}")
+
+
 class HitMeDatabase:
     """
     This provides an abstraction of the HitMe database. Through
@@ -182,87 +261,6 @@ class HitMeDatabase:
     These operations are described in more detail below.
     """
 
-    class HitMeWriteLogger:
-        """
-        This class is a logger used by HitMeDatabase to log all
-        write (modification) operations to a file. This provides
-        log operations corresponding to the 3 write operations
-        listed above as well as the capability to reset the log.
-
-        Log file is HITME_DATABASE_FOLDER/assignment.log
-        """
-
-        def __init__(self, assignment, script):
-            self.assignment = assignment
-            self.script = script
-
-        def _log_message(self, message, append=True):
-            """
-            Helper function that logs a message with user and timestamp
-
-            By default this will append the message to the log file, but it
-            can be used to reset the file
-            """
-
-            # Prefix message with datetime and user
-            log_message = f"{datetime.now().strftime('%Y-%m-%d %I:%M:%S %p')} : {getpass.getuser()}"
-
-            # Add script name if one was provided to wrapping database
-            if self.script is not None:
-                log_message += f" running {self.script}"
-
-            # Add message and write based on being in append mode or not
-            log_message += f" : {message}\n"
-            if append:
-                with open(get_log_path(self.assignment), "a") as f:
-                    f.write(log_message)
-            else:
-                Path(get_log_path(self.assignment)).write_text(log_message)
-
-        def reset(self):
-            """Makes the log file blank"""
-
-            logpath = get_log_path(self.assignment)
-            self._log_message("initialized database", append=False)
-            set_hitme_permissions(logpath)
-
-        def log_set(self, where_col, where_key, update_cols, update_values):
-            """
-            Logs information about a HitMeDatabase::set( ) operation.
-
-            Parameters:
-                where_col: str
-                    Column to check for match
-
-                where_key: Any
-                    Rows where row[where_col] = where_key will be updated
-
-                update_cols: str or list[str]
-                    row[update_cols] will be updated for matching rows
-
-                update_values: Any or list[Any]
-                    row[update_cols] will be updated to update_values for matching rows
-            """
-
-            settings = ", ".join(
-                f"{uc} to {uv}" for uc, uv in zip(update_cols, update_values)
-            )
-            self._log_message(f"set {settings} where {where_col} is {where_key}")
-
-        def log_update(self, *rows):
-            """
-            Logs information about an HitMeDatabase::update( ) operation.
-
-            Parameters:
-                rows: list[dict[HitMeColumn, Any]]
-                    Rows to add to the database formatted in the same
-                        manner as HitMeDatabase::update( ).
-            """
-
-            for row in rows:
-                settings = ", ".join(f"{k} = {v}" for k, v in row.items())
-                self._log_message(f"added new row with {settings}")
-
     def __init__(self, assignment, script=None):
         """
         This does not initialize the database on file or load it into
@@ -277,7 +275,7 @@ class HitMeDatabase:
         """
 
         self.assignment = assignment
-        self.logger = HitMeDatabase.HitMeWriteLogger(assignment, script)
+        self.logger = HitMeWriteLogger(assignment, script)
         self.lock = None
         self.db = None
         self.has_lock = False
@@ -346,7 +344,7 @@ class HitMeDatabase:
             self.db.to_pickle(db_path)
             set_hitme_permissions(db_path)
             set_hitme_permissions(get_lock_path(self.assignment))
-            self.logger.reset()
+            self.logger.log_init()
             self.logger.log_update(*data)
         elif os.path.isfile(db_path):
             self.db = pd.read_pickle(db_path)
@@ -532,7 +530,6 @@ class HitMeDatabase:
         self._check_locked()
 
         cols = self.db.loc[self.db[where_col] == where_key]
-
         if len(cols) == 0:
             if empty_error is not None:
                 raise HitMeException(empty_error)
@@ -655,7 +652,7 @@ class HitMeDatabase:
         """
 
         self._check_loaded()
-        pd_groupby = self.db.groupby(by)
+        pd_groupby = self.db.groupby(by, sort=False)
         if isinstance(aggregate_col, HitMeColumn):
             pre_agg_pd_series = pd_groupby[aggregate_col].apply(list)
         else:
