@@ -315,7 +315,11 @@ This is implemented in [admin](src/admin).
 
 ## Vulnerabilities
 
-This CLI version has similar vulnerabilities as the website version used up to spring 2023. For example, a TA could mark 20 students as done if they wish (including those they did not actually grade). To combat this (unlike the old version) the simple solution, the CLI version logs all write operations to the database in case future investigation is necessary.
+This CLI version has similar vulnerabilities as the website version used up to spring 2023. For example, a TA could mark 20 students as done if they wish (including those they did not actually grade). Furthermore, anyone with knowledge of these commands and the TA setup (i.e.
+updating the proper `PATH` on Halligan) could go in and start causing chaos (running `hitme`, `markdone`, etc.). To combat this (unlike 
+the old version) the simple solution, the CLI version logs all write operations to the database in case future investigation is necessary.
+
+To patch the second problem of locking out other people could be handled by adding a full TA list to `config.toml` and making sure only those people can run any of the scripts (e.g. `hitme`, `markdone`, etc.).
 
 It has the additional vulnerability of `swap` which means they could keep swapping out students they do not want to grade. However, the new student they get is also random.
 
@@ -431,25 +435,58 @@ Example log entry:
 
 ## Changelog
 
-**2/14/2024**
+### 3/11/2024
+
+- Patched bugs with TA permissions enforcement on `admin`, `reset`, and `setup.py`. In particular, previously exceptions would be raised and dump to console, now like in other scripts exceptions are caught and printed.
+- Add SSH authentication failure handling to `setup_assignment.py` and `reset_assignment.py`. 
+
+### 3/10/2024
+
+- Modified setup process:
+  - Setup process (via `setup.py`) is restricted to super users only.
+  - `setup_assignment.sh` is replaced with `setup_assignment.py`. This was done to account for the possibility of a TF who is setting up hitme who uses Windows. Previously, with a `bash` setup script, only Unix-based users (i.e. OSX and Linux) could use this script. Now, it is done in Python which both Windows and Unix users are assumed to have. The only prerequisite now is to install the provided required SSH/SFTP library `paramiko`. 
+- Modified reset process: 
+  - hitme log is no longer deleted by `reset` or when setup is run twice. That is, those operations are added to the same log. If a log becames unwieldingly large, it must be deleted manually. 
+  - Reset process (via `reset`) is restricted to super users only. 
+  - `reset_assignment.sh` is replaced with `reset_assignment.py`. This was done for the same reason as for the setup process described above. Furthermore, user input reset confirmation is moved from remote (`reset`) to local (`reset_assignment.py`).
+- Made `HitMeWriteLogger` as a top level class in `hitme.py`.
+- Further expanded on [this patch](#2292024). In particular, `viewprogress` will break complete count ties on in progress count first before falling back to UTLN. See [viewprogress](src/viewprogress) for more details.
+
+### 3/9/2024
+
+- Made hitme setup process case insensitive for both emails and UTLNs. Student emails are lowercased when initializing the database, but now we also lowercase all user configuration information (emails in exempt users, UTLNs in super users). This enables case insensitive lookups without relying on people specifying configuration with the correct casing. 
+
+### 3/8/2024
+
+- Reverted the index component of the previous patch. This is because a pandas index is not like a SQL index in that it cannot be treated like any other column in terms of selections, updates, etc. Pandas requires special syntax for all operations surrounding an index that overall complicates the implementation more so than benefitting efficiency. It speeds up pandas ops by 2x, but the large amount of time involved with running hitme commands is the time it takes to boot the python interpreter and do the imports (~1s). Pandas ops are < 0.01 s with and without the index. 
+
+### 2/29/2024
+
+- Updated hitme setup process by establishing the student ID as the primary key by making it a sorted index. This will speed up queries (read and write) on that ID (e.g. `getlink` and `markdone`)
+- Updated `HitMeDatabase:groupby( )` to no longer automatically sort (this is default behavior of pandas). Not sorting improves performance.
+- Updated `viewprogress` and `totalprogress` to now list results in increasing order of submissions completed. 
+  - This was done upon request of current staff, it's easier to identify lagging TAs etc. 
+  - The alphabetical sorting by UTLN was done to make it easier to scan for individual TAs but we can just pipe into `grep` (e.g. `viewprogress | grep slamel01`)
+
+### 2/14/2024
 - Small improvements to `viewprogress`
   - Patch display bug introduced from previous update
   - Display emails of students shown to TAs that they have completed or in progress in sorted order
   - Display in progress and complete counts on same name as TA UTLN for TFs so that one could do `viewprogress | grep slamel01`
 - Small improvement to `misc.py` in how we capture screen width
 
-**2/13/2024**
+### 2/13/2024
 - Have `viewprogress` display total submission count before status breakdown at the top
   - Added this because it's nice to check when running the database setup to make sure submission count matches with Gradescope (in the past, you'd have to sum the status counts, so we just have the code replace our mental math).
 
-**2/12/2024**
+### 2/12/2024
 - Improved `admin` help message
 - Added `admin` to this file's documentation
 
-**2/9/2024**
+### 2/9/2024
 - Improved logging (more details, nicer log messages)
 
-**2/4/2024**
+### 2/4/2024
 - Patched a bug where a user could create a lock file with their ownership unknowingly. 
   - In particular, what would happen is, suppose a user runs `hitme` without running `startgrading` at the beginning of a new semester. They would default to trying to `hitme` a student from the last assignment of the previous semester, which doesn't exist as a HitMe database file. I discovered this occurred by noticing (after `hw_arraylists` grading began in spring 2024) that there were a couple lock files in `/comp/15/grading/hitme` that had names from final assignments from last semester.
   - What happened was, in the `HitMeDatabase` constructor, it would instantiate a `FileLock` without checking if the lock file existed. In the setup process, a lock file should be getting created under `cs15acc` ownership. However, if we instantiated a `HitMeDatabase` for an assignment that didn't exist (as in the above scenario) it would make the lock file before checking that the assignment didn't exist.
@@ -460,11 +497,11 @@ Example log entry:
   - However, when existing solutions exist in the output folder, which is the backup folder, when we run multiple times, we have to specifically identify the assignment export folder. `os.listdir( )` provides no guarantees on ordering (based on name, time created, etc.)
   - The fix is, we identify the export folder as the folder starting with "assignment_" and ending with "_export". We did this already to identify the assignment ID.
 
-**2/2/2024**
+### 2/2/2024
 
 - Various setup bug fixes 
 
-**2/1/2024**
+### 2/1/2024
 
 - Added an `admin` command.
   - `admin --get ID` gives you the grader and status for a student with provided ID (email).
@@ -472,7 +509,7 @@ Example log entry:
   - Only super users can run this command. This gives you a way to manually modify the database values modified via the other hitme commands (besides setup).
   - This is just a safety net, an override if something goes wrong with other commands or if a TA doesn't have access to `/comp/15` and can't run hitme. Another TA (who's a super user) could run it for them.
 
-**1/31/2024**
+### 1/31/2024
 
 - Modified setup process to account for extensions.
   - When you run `setup_assignment.sh`, you can now supply IDs (emails) of
@@ -489,13 +526,13 @@ Example log entry:
 - The assignment ID is no longer saved as part of the backup. This can
   be found on Gradescope, and used to be pickled anyway.
 
-**1/18/2024**
+### 1/18/2024
 
 - Updated help descriptions for all commands
 - Since Outlook emails are case-insensitive, enabled case-insensitive email comparison when it comes to commands that take emails (e.g. `drop`, `markdone`, etc.). Therefore, instead of email being our primary key (see below), it's lowercase email.
 - An explicit check is added to ensure that the lowercase email (or whatever is chosen as the student ID) is a primary key when constructing the hitme database in the setup process (see `setup.py`).
 
-**1/9/2024**
+### 1/9/2024
 
 - Swapped to use email instead of SID on Gradescope.
   - When this was initially built, it was assumed the Gradescope SID was set to students' UTLNs. However, this is not the case if the Gradescope page is not linked with a Canvas page where UTLNs are preloaded.
@@ -504,36 +541,36 @@ Example log entry:
 - Added help functionality to all commands as well as a `hitmehelp` command.
 - Added a new `totalprogress` command which allows TFs to see TAs' progress over an entire semester.
 
-**10/20/2023**
+### 10/20/2023
 
 - Added `drop` functionality.
 
-**9/29/2023**
+### 9/29/2023
 
 - Fixed bug with permissions.
 
-**9/22/2023**
+### 9/22/2023
 
 - Fixed bug where if someone ran `startgrading NONEXISTENTASSIGNMENT` followed by `hitme`, it would create a `.LCK` file with that name. This file became undeletable (except by user who ran it). Now, you can only `startgrading` on hitme databases that already exist on file.
 - Changed whenever `setup.py` is run (via `setup_assignment.sh`), the `hitme/` and `backup/` `grading/` subfolders are not permissions modded. This is only done if the directories
   don not already exist.
 
-**9/13/2023**
+### 9/13/2023
 
 - Condensed `ASSIGNEDGRADER` and `COMPLETEDGRADER` into `GRADER`.
 - Fixed bug with initial `viewprogress`.
 
-**8/28/2023**
+### 8/28/2023
 
 - Allowed for `groupby` to return multiple columns.
 - Various bug fixes.
 
-**8/23/2023**
+### 8/23/2023
 
 - Submissions for exempt users are no longer backed up.
 - Various bug fixes.
 
-**8/19/2023**
+### 8/19/2023
 
 - Get first non-beta version up and running on homework server.
 - Add documentation.
