@@ -18,7 +18,8 @@ Date: Fall 2023 - Spring 2024
 int main(int argc, char *argv[]) {
     
     // SUID bit stuff.. don't know the details see the
-    // 15 infra doc for what details I do know
+    // 15 infra doc for what details I do know:
+    // https://docs.google.com/document/d/17dNXUSTioa-Kosv3lPU_y4k7kEo5IVVsrgTj80_0Yk8/edit#heading=h.emeweg40h6co
     setuid(geteuid());
     setgid(getegid());
     setreuid(geteuid(), geteuid());
