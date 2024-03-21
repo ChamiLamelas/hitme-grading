@@ -22,33 +22,30 @@ import setup
 import misc
 import sys
 import os
-
-
-def _confirm_overwrite(assignment):
-    """
-    Has user confirm they want to delete the grading backup and
-    HitMe on file database for an assignment.
-    """
-
-    misc.yellow(f"Hitme has been set up for {assignment}. Grading may have begun.")
-    text = "Are you sure you would like to reset hitme (and delete the backup)? (y/n)"
-    confirmation = misc.prompt(text)
-    while confirmation not in {"y", "n"}:
-        confirmation = misc.prompt(text)
-    return confirmation == "y"
+import hitmeconfig
 
 
 def main():
+    # Abort immediately if TA not authorized 
+    try:
+        hitmeconfig.check_user_is_super_user()
+    except hitme.HitMeException as e:
+        misc.red(str(e))
+        return
+
     # We don't use argparse, because this is passed via reset_assignment
     # which does argument parsing. We know this will be the assignment
     assignment = sys.argv[1]
 
+    # Log the reset 
+    logger = hitme.HitMeWriteLogger(assignment, "reset")
+    logger.log_reset()
+
     # Collect the files to delete to reset hitme and the backup - the
-    # 3 files related to the hitme database and then the backup folder
+    # 2 files related to the hitme database and then the backup folder
     files = [
         hitme.get_db_path(assignment),
         hitme.get_lock_path(assignment),
-        hitme.get_log_path(assignment),
         setup.get_backup_folder(assignment),
     ]
 
@@ -57,16 +54,13 @@ def main():
         misc.blue(f"HitMe has not been setup for {assignment} - nothing to do.")
         return
 
-    # Make sure they actually want to delete - if so, do the deletions
-    if _confirm_overwrite(assignment):
-        for file in files:
-            if os.path.isfile(file):
-                os.remove(file)
-            elif os.path.isdir(file):
-                shutil.rmtree(file)
-        misc.green(f"HitMe and backup reset successfully for {assignment}")
-    else:
-        misc.green(f"HitMe reset cancelled")
+    # Delete necessary files and folders 
+    for file in files:
+        if os.path.isfile(file):
+            os.remove(file)
+        elif os.path.isdir(file):
+            shutil.rmtree(file)
+    misc.green(f"HitMe and backup reset successfully for {assignment}")
 
 
 if __name__ == "__main__":
