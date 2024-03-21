@@ -13,7 +13,7 @@ import misc
 import getpass
 from hitme import HitMeColumn, HitMeDatabase, HitMeStatus, HitMeException
 from hitmeconfig import get_assignment
-import os 
+import os
 
 DESCRIPTION = """
 Use this script to mark that you have completed grading a student.
@@ -26,7 +26,7 @@ if __name__ == "__main__":
         "student",
         "Student email (for multiple students, separate emails by a comma with no space)",
         misc.help(DESCRIPTION),
-        misc.lower
+        misc.lower,
     )
     db = None
     try:
