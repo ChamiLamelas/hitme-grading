@@ -12,7 +12,7 @@ import yaml
 import sys
 import argparse
 import filecmp
-import shutil 
+import shutil
 
 HITME_COMMANDS = [
     "drop",
@@ -25,13 +25,6 @@ HITME_COMMANDS = [
     "viewprogress",
 ]
 """List of all commands in our system available to regular users -- make sure to keep this updated!"""
-
-
-def prompt(text):
-    """Prompts with warning color"""
-
-    yellow(text, end=" ")
-    return input()
 
 
 def dirs_differ(dir1, dir2):
