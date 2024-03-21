@@ -22,6 +22,7 @@ import os
 import zipfile
 import hitmeconfig as hmc
 import sys
+import getpass 
 
 # Path to backup folder (for all assignments)
 BACKUP_FOLDER = os.path.join(GRADING_FOLDER, "backup")
@@ -122,12 +123,6 @@ class HitMeSetup:
         extensions: set[str]
             Set of IDs (emails) of students granted extensions
 
-        course_id: str
-            Gradescope course ID
-
-        exempt_users: set[str]
-            Set of IDs of exempt users
-
         db: HitMeDatabase
             Internal database that we will be setting up/updating
 
@@ -159,8 +154,6 @@ class HitMeSetup:
     def __init__(self, assignment, extensions):
         self.assignment = assignment
         self.extensions = set(extensions)
-        self.course_id = hmc.get_course_id()
-        self.exempt_users = hmc.get_exempt_users()
         try:
             # We will be interacting with database and modifying
             # it, potentially, on a rerun of setup.py we could
@@ -408,7 +401,7 @@ class HitMeSetup:
         """Display a message informing if we're editing an existing database"""
 
         misc.blue(
-            f"A HitMe database has already been initialized for {self.assignment}. Its contents may be updated in this setup run. If you would like to delete the previous database, download and run reset_assignment.sh."
+            f"A HitMe database has already been initialized for {self.assignment}. Its contents may be updated in this setup run. If you would like to delete the previous database, download and run reset_assignment.py."
         )
 
     def _should_keep(self, ids):
@@ -421,7 +414,7 @@ class HitMeSetup:
         """
 
         return (
-            len(self.exempt_users.intersection(ids)) == 0
+            len(hmc.get_exempt_users().intersection(ids)) == 0
             and len(self.extensions.intersection(ids)) == 0
         )
 
@@ -431,7 +424,7 @@ class HitMeSetup:
         course and assignment this setup pertains to
         """
 
-        return f"https://www.gradescope.com/courses/{self.course_id}/assignments/{self.assignment_id}/submissions/{submission_id}#"
+        return f"https://www.gradescope.com/courses/{hmc.get_course_id()}/assignments/{self.assignment_id}/submissions/{submission_id}#"
 
     def _make_row(self, names, ids, submission_id):
         """
@@ -457,6 +450,13 @@ class HitMeSetup:
 
 
 def main():
+    # Abort immediately if TA not authorized 
+    try:
+        hmc.check_user_is_super_user()
+    except HitMeException as e:
+        misc.red(str(e))
+        return 
+    
     _make_grading_folders()
     HitMeSetup(sys.argv[1], sys.argv[2:])
 
