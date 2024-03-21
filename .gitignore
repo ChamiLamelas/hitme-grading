@@ -1,5 +1,7 @@
 # Custom
 *.zip
+src/setup.o
+src/setup
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
