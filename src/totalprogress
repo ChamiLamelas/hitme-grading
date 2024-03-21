@@ -23,6 +23,8 @@ Use this script to view the total grading progress for all TAs this semester.
 if __name__ == "__main__":
     try:
         misc.check_no_arguments(misc.help(DESCRIPTION))
+
+        # Abort immediately if TA not authorized 
         hitmeconfig.check_user_is_super_user()
 
         all_progress = Counter()
@@ -43,7 +45,10 @@ if __name__ == "__main__":
                 for k in progress:
                     all_progress[k] += progress[k].count(hitme.HitMeStatus.COMPLETE)
 
-        for grader, grader_progress in sorted(all_progress.items(), key=lambda e: e[0]):
+        # Sort in increasing order of total submissions completed
+        # If UTLNs tie on total submissions completed, then those
+        # are sorted by TA UTLN
+        for grader, grader_progress in sorted(all_progress.items(), key=lambda e: e[1]):
             # Prints something like:
             # slamel01      1 Complete
 
