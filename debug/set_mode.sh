@@ -25,33 +25,44 @@
 # Make sure you run bash set_mode.sh release before you push!
 #
 # Chami Lamelas
-# Fall 2023
+# Fall 2023 - Spring 2024 
 
+# Check 1 argument provided
 if [ $# -lt 1 ]; then
     echo "Usage: set_mode.sh [ debug | release ]"
     exit 1
 fi
 
+# Check that argument is either debug or release 
 MODE=$1
 if [ $MODE != "debug" ] && [ $MODE != "release" ]; then
     echo "Usage: set_mode.sh [ debug | release ]"
     exit 1
 fi
 
+# Remove the debug grading folder if it already exists 
 DEBUGGRADING="/h/$USER/cs15/grading"
 if [ -d $DEBUGGRADING ]; then
     rm -rf $DEBUGGRADING
 fi
 
+# If debug mode, replace /comp/15 with /h/username/cs15 in 
+# the necessary files (see sed below) and then make
+# the debug grading folder  
 if [ $MODE = "debug" ]; then
     FIND="/comp/15"
     REPLACE="/h/$USER/cs15"
     mkdir $DEBUGGRADING
 else
+    # In release mode, do the opposite -- use the real cs15 folder
+    # which is /comp/15 
     FIND="/h/$USER/cs15"
     REPLACE="/comp/15"
 fi
 
-sed -i "s\\"$FIND"\\"$REPLACE"\g" ../src/hitme.py ../src/setup.c ../src/setup.sh ../setup/setup_assignment.sh ../setup/reset_assignment.sh
+sed -i "s\\"$FIND"\\"$REPLACE"\g" ../src/hitme.py ../src/setup.c ../src/setup.sh ../setup/setup_assignment.py ../setup/reset_assignment.py
+
+# Recompile setup.c -> setup (python scripts obviously don't
+# have to be recompiled)
 cd ../src
 make
