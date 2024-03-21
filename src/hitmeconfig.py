@@ -24,9 +24,13 @@ CURRENT_ASSIGNMENT_FILE = os.path.expanduser(
 def get_exempt_users():
     """
     Gets set of exempt users -- users whose submissions will be
-    skipped. The set is of strings of Gradescope names.
+    skipped. The set is of strings of Gradescope emails - lowercased.
+
+    We lowercase to enable case insensitve check -- again emails should 
+    be treated case insensitively 
     """
-    return set(toml.load(HITME_CONFIG_PATH)["hitme"]["EXEMPT_USERS"])
+    
+    return { u.lower() for u in toml.load(HITME_CONFIG_PATH)["hitme"]["EXEMPT_USERS"] }
 
 
 def check_user_is_super_user(error=True):
@@ -40,10 +44,23 @@ def check_user_is_super_user(error=True):
     the user - e.g. viewprogress)
 
     If the user is a super user, True is returned
+
+    The comparison is done in a case insensitive manner because program
+    users on the Tufts homework servers are Tufts UTLNs. 
+
+    This is safe to use within Python scripts that are invoked via
+    a SUID-bit set C executable (e.g. setup.py invoked from setup). 
     """
 
-    user = getpass.getuser()
-    if user not in set(toml.load(HITME_CONFIG_PATH)["hitme"]["SUPER_USERS"]):
+    # The reason this is SUID-script-safe is because setuid modifies 
+    # the user ID of a process which is separate from the environment
+    # variables checked by getpass.getuser( ) (see its documentation
+    # here: https://docs.python.org/3/library/getpass.html#getpass.getuser)
+    # It seems like these environment variables are unrelated from
+    # user IDs, and are set elsewhere in Linux sessions: 
+    # https://unix.stackexchange.com/a/76356
+    user = getpass.getuser().lower()
+    if user not in { u.lower() for u in toml.load(HITME_CONFIG_PATH)["hitme"]["SUPER_USERS"] }:
         if error:
             raise HitMeException(
                 f"You ({user}) are not a HitMe super user. Please contact the infra team."
