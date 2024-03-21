@@ -87,6 +87,9 @@ def handle_set(ids, grader, status):
 
     db = None
     try:
+        # Abort immediately if TA not authorized 
+        hitmeconfig.check_user_is_super_user()
+
         # Convert grader to None if a none like string was
         # passed, otherwise leave the same
         grader = check_grader_none(grader)
@@ -129,6 +132,9 @@ def handle_get(ids):
 
     db = None
     try:
+        # Abort immediately if TA not authorized 
+        hitmeconfig.check_user_is_super_user()
+
         # Initialize database as in most of the other files
         # that access the database
         assignment = hitmeconfig.get_assignment()
@@ -183,8 +189,7 @@ def get_args():
 
 
 def main():
-    hitmeconfig.check_user_is_super_user()
-    args = get_args()
+    args = get_args()    
     if args.set is not None:
         handle_set(*args.set)
     else:
