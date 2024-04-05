@@ -18,12 +18,15 @@ import hitmeconfig
 import argparse
 import hitme
 import misc
-import os 
+import os
 
 
 DESCRIPTION = """
-Allows you to modify the hitme database with --set. In particular, 
-make the same modifications the other hitme commands perform. 
+Allows you to modify the hitme database with --set and --assign
+and query it with --get.
+
+In particular, --set allows you to make the same modifications 
+the other hitme commands perform except on other graders. 
 
 At a high level: 
     admin --set john.smith@tufts.edu slamel01 1
@@ -44,6 +47,20 @@ For a full list of the status codes:
     Pass in 3 to put someone as complete 
 
 You can also access grader and status values for a student with --get. 
+
+--assign allows you to assign a certain number of students ahead
+of time to a particular grader. This is useful for assigning people
+submissions before hand if they're behind on grading. 
+
+For example, admin --assign slamel01 8 is identical to do doing: 
+
+hitme
+hitme
+(... 6 more times)
+
+admin --set studentemail1@tufts.edu slamel01 1
+admin --set studentemail2@tufts.edu slamel01 1
+(... 6 more times)
 """
 
 EPILOG = """
@@ -65,7 +82,7 @@ def check_grader_none(grader):
 
 def str_to_hitmestatus(status):
     """
-    Converts a status specified as a string into a HitMeStatus
+    Converts a status specified as a string in --set into a HitMeStatus
     object. Converts a str -> int -> HitMeStatus. If this fails,
     a HitMeException is raised to signal --set should abort.
     """
@@ -82,14 +99,29 @@ def str_to_hitmestatus(status):
         raise hitme.HitMeException("\n".join(error))
 
 
+def str_to_grading_count(grading_load):
+    """
+    Converts a grading count specified as a string in --assign to a
+    positive integer. If this fails, a HitMeException is raised to signal
+    --assign should abort.
+    """
+
+    try:
+        grading_load = int(grading_load)
+        if grading_load <= 0:
+            raise ValueError
+        return grading_load
+    except ValueError:
+        raise hitme.HitMeException(
+            f"Grading load ({grading_load}) must be a positive integer"
+        )
+
+
 def handle_set(ids, grader, status):
     """Handles the --set command given its arguments."""
 
     db = None
     try:
-        # Abort immediately if TA not authorized 
-        hitmeconfig.check_user_is_super_user()
-
         # Convert grader to None if a none like string was
         # passed, otherwise leave the same
         grader = check_grader_none(grader)
@@ -105,11 +137,10 @@ def handle_set(ids, grader, status):
 
         # We're going to write, so we get the lock, load
         # fresh version and then set based on user parameters
-        # (no checks)
         db.acquire_writelock()
         db.load()
 
-        # Set based on user parameters (now verified)
+        # Set based on user parameters
         db.set(
             hitme.HitMeColumn.STUDENT_IDS,
             ids,
@@ -132,9 +163,6 @@ def handle_get(ids):
 
     db = None
     try:
-        # Abort immediately if TA not authorized 
-        hitmeconfig.check_user_is_super_user()
-
         # Initialize database as in most of the other files
         # that access the database
         assignment = hitmeconfig.get_assignment()
@@ -160,13 +188,63 @@ def handle_get(ids):
         misc.red(str(e))
 
 
+def handle_assign(grader, grading_load):
+    """Handles the --assign command given its arguments."""
+
+    db = None
+    try:
+        # Try to convert grading load to an int
+        grading_load = str_to_grading_count(grading_load)
+
+        # Initialize database as in most of the other files
+        # that access the database
+        assignment = hitmeconfig.get_assignment()
+        db = hitme.HitMeDatabase(assignment, os.path.basename(__file__))
+
+        # We're going to write, so we get the lock, load
+        # fresh version and then set based on user parameters
+        db.acquire_writelock()
+        db.load()
+
+        # Get grading_load not started submissions
+        rows = db.get(
+            hitme.HitMeColumn.STATUS,
+            hitme.HitMeStatus.NOT_STARTED,
+            [
+                hitme.HitMeColumn.STUDENT_NAMES,
+                hitme.HitMeColumn.STUDENT_IDS,
+                hitme.HitMeColumn.GRADESCOPE_URL,
+            ],
+            limit=grading_load,
+            empty_error=f"There are no unassigned students for {db.assignment}",
+        )
+
+        # Set each one to the grader -- we can't do a single set
+        # because hitme database only supports single row updates
+        for row in rows:
+            db.set(
+                hitme.HitMeColumn.STUDENT_IDS,
+                row[hitme.HitMeColumn.STUDENT_IDS],
+                [hitme.HitMeColumn.STATUS, hitme.HitMeColumn.GRADER],
+                [hitme.HitMeStatus.IN_PROGRESS, grader],
+            )
+            misc.green(
+                f"{grader} was assigned to grade {row[hitme.HitMeColumn.STUDENT_NAMES]} ({row[hitme.HitMeColumn.STUDENT_IDS]}) for {assignment}."
+            )
+    except hitme.HitMeException as e:
+        misc.red(str(e))
+    finally:
+        if db is not None:
+            db.release_writelock()
+
+
 def get_args():
     """Sets up and gets the command line arguments"""
 
     parser = argparse.ArgumentParser(
-        description=DESCRIPTION, 
-        formatter_class=argparse.RawDescriptionHelpFormatter, 
-        epilog=EPILOG
+        description=DESCRIPTION,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=EPILOG,
     )
 
     # A "mutually exclusive group" is one that either parameter
@@ -185,15 +263,27 @@ def get_args():
         type=str,
         help="Gives you the grader and status for a student with provided ID (email).",
     )
+    group.add_argument(
+        "--assign",
+        metavar=("grader", "grading_load"),
+        nargs=2,
+        type=str,
+        help="Assigns grading_load (#) of submissions to the provided grader.",
+    )
     return parser.parse_args()
 
 
 def main():
-    args = get_args()    
+    # Abort immediately if TA not authorized
+    hitmeconfig.check_user_is_super_user()
+
+    args = get_args()
     if args.set is not None:
         handle_set(*args.set)
-    else:
+    elif args.get is not None:
         handle_get(args.get)
+    else:
+        handle_assign(*args.assign)
 
 
 if __name__ == "__main__":
