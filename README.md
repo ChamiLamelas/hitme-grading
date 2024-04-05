@@ -119,6 +119,8 @@ This process is implemented over the following files:
 - [setup.py](src/setup.py)
 - [setup_assignment.sh](setup/setup_assignment.sh)
 
+All the SUID bit stuff via these files may not be necessary for your application.
+
 ## HitMe Operations
 
 In this section, we describe using simplified SQL how to implement each of the operations in the CLI version of HitMe to replicate what is provided on the website. These are just general pseudocode algorithms, and do not cover all the details. We recommend viewing the documented source code for more information.
@@ -432,6 +434,10 @@ Example log entry:
 * The `reset_assignment.sh` script (found in the same place as `setup_assignment.sh`) can be used to wipe a backup and hitme database if this is really needed.
 
 ## Changelog
+
+### 4/5/2024
+- Added `admin --assign` command for assigining a batch of assignments to a grader.
+- Updated `setup.sh` based on fix from EECS staff (caused an import bug)
 
 ### 3/11/2024
 
