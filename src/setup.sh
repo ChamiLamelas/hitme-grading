@@ -6,8 +6,7 @@
 # Author: Chami Lamelas (slamel01)
 # Date: Fall 2023 - Spring 2024
 
-PATH=/usr/sup/bin:$PATH
-LD_LIBRARY_PATH=/usr/sup/lib:/usr/sup/lib64:${LD_LIBRARY_PATH}
-export LD_LIBRARY_PATH
+export PATH=/usr/sup/bin:$PATH
+export LD_LIBRARY_PATH=/usr/sup/lib64:/usr/sup/lib:${LD_LIBRARY_PATH}
 
 python3 /comp/15/staff-bin/hitme/src/setup.py $@
