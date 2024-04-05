@@ -286,13 +286,15 @@ Note this is not implemented exactly in this manner using our HitMe database as 
 
 ### Admin 
 
-This is a special command for directly manipulating the database (`admin --set`). This has proved useful in the following scenarios: 
+This is a special command for directly manipulating the database via `admin --set`. This has proved useful in the following scenarios: 
 * A TA accidentally moves to another student on Gradescope that was assigned to another TA (or no TA)
   - Fix: A super user can run `admin --set` to assign the student to the TA who made the Gradescope mistake 
 * Someone forgot to add an extension student when setting up hitme. 
   - Fix: A super user can run `admin --set` to assign the student to themself and hold them there until the extension window expires and the student (with their finished work) can be added into the database. That way, another TA won't accidentally start grading them. 
 
 It also has a mode for seeing who has been assigned to grade a particular student (`admin --get`). 
+
+It also has an `admin --assign` mode for running `hitme` on the behalf of another TA for a certain grading load (number) for TAs who need to be preloaded with grading assignments ahead of time. This is useful for TAs who are behind on grading. 
 
 `admin --set <STUDENTEMAIL> <TAUTLN> <GRADINGSTATUS>` is implemented with: 
 
@@ -311,6 +313,27 @@ RELEASE LOCK
 SELECT GRADER, STATUS
 FROM HITMEDATABASE
 WHERE STUDENTIDS = <STUDENTEMAIL>
+```
+
+`admin --assign <TAUTLN> <GRADINGLOAD>` is implemented with
+
+```sql
+ACQUIRE LOCK
+
+SAMPLEDSTUDENTIDS = (
+    SELECT STUDENTIDS LIMIT <GRADINGLOAD>
+    FROM HITMEDATABASE
+    WHERE STATUS = NOTSTARTED
+)
+
+-- This is more psuedocode than SQL
+FOR ID IN SAMPLEDSTUDENTIDS (
+  UPDATE HITMEDATABASE
+  SET STATUS = INPROGRESS, GRADER = <TAULTN>
+  WHERE STUDENTIDS = ID
+)
+
+RELEASE LOCK
 ```
 
 This is implemented in [admin](src/admin).
