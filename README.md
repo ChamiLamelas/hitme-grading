@@ -458,6 +458,9 @@ Example log entry:
 
 ## Changelog
 
+### 4/11/2024
+- Made `dirs_differ` to do sorted comparisons of folder contents.
+
 ### 4/5/2024
 - Added `admin --assign` command for assigining a batch of assignments to a grader.
 - Updated `setup.sh` based on fix from EECS staff (caused an import bug)
