@@ -40,10 +40,12 @@ def dirs_differ(dir1, dir2):
         True if dir1 and dir2 have different files
     """
 
-    dir1_files = os.listdir(dir1)
+    # Do all list comparisons as sorted list comparisons just in case 
+    # of differences in file orderings -- this may not be necessary 
+    dir1_files = sorted(os.listdir(dir1))
 
     # Check if they have different file names in their directories
-    if dir1_files != os.listdir(dir2):
+    if dir1_files != sorted(os.listdir(dir2)):
         return True
 
     # Now, compare the files in the directories the files to compare
@@ -53,7 +55,7 @@ def dirs_differ(dir1, dir2):
     output = filecmp.cmpfiles(dir1, dir2, dir1_files, shallow=False)
 
     # Files differ if the files that match do not include all the files
-    return output[0] != dir1_files
+    return sorted(output[0]) != dir1_files
 
 
 def help(command_help=None):
