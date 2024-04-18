@@ -340,12 +340,12 @@ This is implemented in [admin](src/admin).
 
 ## Vulnerabilities
 
-This CLI version has similar vulnerabilities as the website version used up to spring 2023. For example, a TA could mark 20 students as done if they wish (including those they did not actually grade). To combat this  (unlike the old version) the simple solution is that the CLI version logs all write operations to the database in case future investigation is necessary.
+This CLI version has similar vulnerabilities as the website version used up to spring 2023. For example, a TA could mark 20 students as done if they wish (including those they did not actually grade). To combat this (unlike the old version) the simple solution, the CLI version logs all write operations to the database in case future investigation is necessary.
+
+A TA could still technically delete the file, if you really didn't trust TAs, you could have all scripts run with elevated privileges (like the setup script) thus locking TAs out from interacting with any hitme files outside of interaction via the hitme commands.
 
 It has the additional vulnerability of `swap` which means they could keep swapping out students they do not want to grade. However, the new student they get is also random.
 
-Since the hitme source code folder on Halligan is limited to those in the `ta15` group, only current 
-CS15 TAs can access these scripts and the corresponding folders/files they modify.
 ## Compatability
 
 The spring 2024 version of hitme that uses emails is not compatible with the summer - fall 2023 version of hitme which used Gradescope sids. This should not be noticeable as each semester a new version of `/comp/15` is built off the corresponding `/g/15` mirror.
@@ -457,6 +457,9 @@ Example log entry:
 * The `reset_assignment.sh` script (found in the same place as `setup_assignment.sh`) can be used to wipe a backup and hitme database if this is really needed.
 
 ## Changelog
+
+### 4/18/2024
+- Update vulnerabilities 
 
 ### 4/11/2024
 - Made `dirs_differ` to do sorted comparisons of folder contents.
