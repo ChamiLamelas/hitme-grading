@@ -40,8 +40,8 @@ def dirs_differ(dir1, dir2):
         True if dir1 and dir2 have different files
     """
 
-    # Do all list comparisons as sorted list comparisons just in case 
-    # of differences in file orderings -- this may not be necessary 
+    # Do all list comparisons as sorted list comparisons just in case
+    # of differences in file orderings -- this may not be necessary
     dir1_files = sorted(os.listdir(dir1))
 
     # Check if they have different file names in their directories
@@ -117,11 +117,12 @@ def get_one_argument(argument, argument_help, description, modifier=None):
 def check_no_arguments(description):
     """Handles scripts that take no arguments, but still will display a help message"""
 
+    script = os.path.basename(sys.argv[0])
     if len(sys.argv) == 2 and sys.argv[1] in {"-h", "--help"}:
-        print(f"{sys.argv[0]}: {description[0]}\n{description[1]}")
+        print(f"{script}: {description[0]}\n{description[1]}")
         sys.exit(0)
     elif len(sys.argv) != 1:
-        red(f"{sys.argv[0]} takes no arguments")
+        red(f"{script} takes no arguments")
         sys.exit(1)
 
 
@@ -201,3 +202,56 @@ def red(text, end="\n"):
     """Prints message in red"""
 
     colored_print(text, end, "31m")
+
+
+def read_first_line(fp):
+    """Reads and returns first line of a file"""
+
+    with open(fp) as f:
+        return next(iter(f))
+
+
+def drop_extension(fp):
+    """Drop extension from filepath if one is present"""
+
+    idx = fp.find(".")
+    if idx < 0:
+        return fp
+    return fp[:idx]
+
+
+def left_justify_list(ls):
+    """
+    Left justifies the elements of a list so that they are
+    right padded for use in a table. 
+
+    For example, suppose we have ls = ["a", "bob", "slamel01"]
+
+    Let X be a space. The output would be: 
+
+    aXXXXXXXXXXXXXXX
+    bobXXXXXXXXXXXXX
+    slamel01XXXXXXXX
+    
+    That way whatever is printed right of the returned list 
+    elements will all start at the same spot.
+    """
+
+    # We have the columns have a width that is some multiple
+    # of tab length, and an 8-space tab looks the nicest in
+    # my opinion
+    indent_size = 8
+    max_len = max(len(e) for e in ls)
+    justification = ((max_len // indent_size) + 1) * indent_size
+    return [e.ljust(justification) for e in ls]
+
+
+def split_into_lists(ls):
+    """Turns a list of 2-tuples into 2 lists"""
+
+    ls1 = list()
+    ls2 = list()
+    for e1, e2 in ls:
+        ls1.append(e1)
+        ls2.append(e2)
+    return ls1, ls2
