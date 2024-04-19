@@ -273,7 +273,8 @@ This has 3 steps:
 
 ### Total Progress
 
-This is similar to view progress. It gives a TF how much each TA graded over the course of the semester. It can be run at any point in the semester. It is a unique command in that `startgrading` does not have to be run before hand. It solely relies on the appropriate files in `/comp/15`. The following is done for each HitMe database file that has been initialized so far:
+
+This is similar to view progress. It tells a TF how much each TA graded over the course of the semester. It can be run at any point in the semester. It is a unique command in that `startgrading` does not have to be run before hand. It solely relies on the appropriate files in `/comp/15`. The following is done for each HitMe database file that has been initialized so far:
 
 ```sql
 SELECT GRADER, COUNT(STATUS)
@@ -283,6 +284,16 @@ GROUP BY GRADER
 ```
 
 Note this is not implemented exactly in this manner using our HitMe database as a groupby plus filter is not possible. See [totalprogress](src/totalprogress) for more details.
+
+It has an additional mode where it can get a breakdown per assignment
+for a particular TA in which case the SQL query, for a particular 
+assignment, would be: 
+
+```sql
+SELECT GRADER, COUNT(STATUS)
+FROM HITMEDATABAE
+WHERE STATUS = COMPLETE
+```
 
 ### Admin 
 
@@ -457,6 +468,11 @@ Example log entry:
 * The `reset_assignment.sh` script (found in the same place as `setup_assignment.sh`) can be used to wipe a backup and hitme database if this is really needed.
 
 ## Changelog
+
+### 4/19/2024
+- Cleaned up help description for 0 argument commands (e.g. `hitme`, `viewprogress`)
+- Cleaned up tabular printing in `viewprogress`, `totalprogress`. 
+- Added option to show the completed counts per assignment for a TA with `totalprogress UTLN`. 
 
 ### 4/18/2024
 - Update vulnerabilities 
