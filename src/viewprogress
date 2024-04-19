@@ -103,8 +103,8 @@ if __name__ == "__main__":
             print()
 
         if check_user_is_super_user(error=False):
-            # If user is not a super user just silently don't 
-            # execute this code -- TAs won't see this (and 
+            # If user is not a super user just silently don't
+            # execute this code -- TAs won't see this (and
             # won't know that they can't)
 
             # This is a dict[2-tuple, int] (e.g.
@@ -131,25 +131,34 @@ if __name__ == "__main__":
             # if graders tie on total submissions completed, then
             # those ties are sorted in decreasing order of submissions
             # in progress, and if graders tie on both they are sorted
-            # on UTLN which is unique and will have no ties. 
+            # on UTLN which is unique and will have no ties.
             # The goal of the view is to show TAs in increasing order
-            # of grading completion. A TA that has completed more 
+            # of grading completion. A TA that has completed more
             # than another TA is considered to have made more progress.
             # A TA with more in progress than another TA is considered
             # to have made less progress.
-            for grader, grader_progress in sorted(ta_breakdown.items(), 
-                key=lambda e: (e[1][HitMeStatus.COMPLETE], -e[1][HitMeStatus.IN_PROGRESS], e[0])):
+
+            graders, graders_progress = misc.split_into_lists(
+                sorted(
+                    ta_breakdown.items(),
+                    key=lambda e: (
+                        e[1][HitMeStatus.COMPLETE],
+                        -e[1][HitMeStatus.IN_PROGRESS],
+                        e[0],
+                    ),
+                )
                 # Flip the sign of progress count because we are sorting in
                 # increasing order for negative numbers equates to
                 # decreasing order for positive numbers
+            )
 
+            for grader, grader_progress in zip(
+                misc.left_justify_list(graders), graders_progress
+            ):
                 # Prints something like:
                 # slamel01      1 Complete, 2 In Progress
                 # slamel01 would be blue, 1 would be green, 2 would be yellow
-
-                # ljust pads with spaces, so there will always be 16 characters
-                # before the complete count: https://stackoverflow.com/a/5676676
-                misc.blue(grader.ljust(16), end="")
+                misc.blue(grader, end="")
                 for status, end in zip(
                     [HitMeStatus.COMPLETE, HitMeStatus.IN_PROGRESS], [", ", "\n"]
                 ):
