@@ -5,7 +5,7 @@ Allows a TF to view the overall grading progress for each TA for the whole semes
 
 For more information - view staff-bin/hitme/README.md.
 
-Liam Drew
+Liam Drew, Chami Lamelas
 Spring 2024
 """
 
@@ -14,48 +14,166 @@ import hitme
 from collections import Counter
 import misc
 import hitmeconfig
+import argparse
+from datetime import datetime
 
 
 DESCRIPTION = """
-Use this script to view the total grading progress for all TAs this semester.
+Use this script to view the total grading progress for all or a 
+particular TA for this semester.
+
+If a particular TA is specified, you will see how much they graded
+per assignment. 
+
+If no particular TA is specified, you will see how much all of the 
+TAs graded in total sorted in increasing order of total submissions 
+completed. If TAs tie on total submissions completed, then those
+are sorted by TA UTLN (alphabetically).
 """
+
+
+def get_grader():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-g",
+        "--grader",
+        type=str,
+        default=None,
+        help="Grader (UTLN) for who we want to see their progress per assignment.",
+    )
+    return parser.parse_args().grader
+
+
+def get_assignments_for_semester():
+    """
+    Gets the assignment names for a semester by looking 
+    in the folder where the hitme database files sit. 
+
+    The assignment names are returned in the order in which
+    the hitme databases were initially setup for these 
+    assignments. 
+    """
+
+    assignments_and_create_times = list()
+    for entry in os.scandir(hitme.HITME_DATABASE_FOLDER):
+
+        # Database files end with pkl 
+        if entry.name.endswith("pkl"):
+
+            # We cannot rely on scandir( ) returning files
+            # in any particular order. Furthermore, we cannot
+            # rely on pkl file creation/birth time either. 
+            # This is because whenever a hitme database
+            # is updated by means of one of the commands
+            # the database is written back to the file (which
+            # modifies the file's metadata and appears as
+            # a new 'creation')
+
+            # Instead, we look at the first timestamp in
+            # the database modification log (i.e. when
+            # someone first runs setup). We do so by
+            # grabbing the first line of the log and then
+            # grabbing the timestamp from the beginning
+            first_log_line = misc.read_first_line(
+                misc.drop_extension(entry.path) + ".log"
+            )
+            timestamp = datetime.strptime(
+                first_log_line[: first_log_line.index(" :")],
+                hitme.LOG_TIME_FORMAT,
+            )
+            assignments_and_create_times.append((entry.name.split(".")[0], timestamp))
+    
+    # Returns assignments now sorting using constructed datetime
+    # objects
+    return [e[0] for e in sorted(assignments_and_create_times, key=lambda e: e[1])]
+
+
+def print_complete_count(complete_count):
+    """
+    Prints a complete count nicely, it will look like X complete
+    where X is green, complete is white
+    """
+
+    misc.green(complete_count, end=" ")
+    print("complete")
+
+
+def show_all_tas():
+    """Shows completed counts for all the TAs across all assignments"""
+
+    all_progress = Counter()
+
+    for assignment in get_assignments_for_semester():
+        db = hitme.HitMeDatabase(assignment)
+        db.load()
+        progress = db.groupby(hitme.HitMeColumn.GRADER, hitme.HitMeColumn.STATUS)
+
+        # Counts the number of complete assignments for the grader
+        # Example:
+        #   progess = { "wdrew02": [HitMeStatus.IN_PROGRESS, HitMeStatus.COMPLETE]}
+        # This loop adds 1 to all_progess["wdrew02"]
+        for k in progress:
+            all_progress[k] += progress[k].count(hitme.HitMeStatus.COMPLETE)
+
+    # Sort in increasing order of total submissions completed
+    # If UTLNs tie on total submissions completed, then those
+    # are sorted by TA UTLN
+    graders, graders_completed = misc.split_into_lists(
+        sorted(all_progress.items(), key=lambda e: e[1])
+    )
+
+    for grader, completed in zip(misc.left_justify_list(graders), graders_completed):
+        # Prints something like:
+        # slamel01      1 Complete
+        misc.blue(grader, end="")
+        print_complete_count(completed)
+
+
+def show_one_ta(grader):
+    """Shows a TA's completions per assignment"""
+
+    misc.blue(f"Total semester progress for {grader}")
+    assignments_completed = list()
+    assignments = get_assignments_for_semester()
+
+    for assignment in assignments:
+        # Just count the number of assignments the grader
+        # marked completed for the assignment
+        db = hitme.HitMeDatabase(assignment)
+        db.load()
+
+        # This will give something like [COMPLETE, COMPLETE, ...]
+        ta_info = db.get(hitme.HitMeColumn.GRADER, grader, hitme.HitMeColumn.STATUS)
+
+        # Note, ta_info could be empty, in which case we add a 0 here
+        assignments_completed.append(ta_info.count(hitme.HitMeStatus.COMPLETE))
+    
+    # Left column will also have total -- we want to justify
+    # that too to put in table 
+    left_column = misc.left_justify_list(assignments + ["Total"])
+    right_column = assignments_completed + [sum(assignments_completed)]
+
+    # Print assignments in white 
+    for assignment, completed in list(zip(left_column, right_column))[:-1]:
+        print(assignment, end="")
+        print_complete_count(completed)
+
+    # Print total in blue
+    misc.blue(left_column[-1], end="")
+    print_complete_count(right_column[-1])
+
 
 if __name__ == "__main__":
     try:
-        misc.check_no_arguments(misc.help(DESCRIPTION))
+        grader = get_grader()
 
-        # Abort immediately if TA not authorized 
+        # Abort immediately if TA not authorized
         hitmeconfig.check_user_is_super_user()
 
-        all_progress = Counter()
+        if grader is None:
+            show_all_tas()
+        else:
+            show_one_ta(grader)
 
-        for entry in os.scandir(hitme.HITME_DATABASE_FOLDER):
-            if entry.name.endswith("pkl"):
-                assignment = entry.name.split(".")[0]
-                db = hitme.HitMeDatabase(assignment)
-                db.load()
-                progress = db.groupby(
-                    hitme.HitMeColumn.GRADER, hitme.HitMeColumn.STATUS
-                )
-
-                # Counts the number of complete assignments for the grader
-                # Example:
-                #   progess = { "wdrew02": [HitMeStatus.IN_PROGRESS, HitMeStatus.COMPLETE]}
-                # This loop adds 1 to all_progess["wdrew02"]
-                for k in progress:
-                    all_progress[k] += progress[k].count(hitme.HitMeStatus.COMPLETE)
-
-        # Sort in increasing order of total submissions completed
-        # If UTLNs tie on total submissions completed, then those
-        # are sorted by TA UTLN
-        for grader, grader_progress in sorted(all_progress.items(), key=lambda e: e[1]):
-            # Prints something like:
-            # slamel01      1 Complete
-
-            # Stole this from viewprogress -- see there
-            misc.blue(grader.ljust(16), end="")
-
-            misc.green(grader_progress, end=" ")
-            print("Complete")
     except hitme.HitMeException as e:
         misc.red(str(e))
