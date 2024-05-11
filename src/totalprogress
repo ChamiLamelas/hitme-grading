@@ -115,12 +115,21 @@ def show_all_tas():
         for k in progress:
             all_progress[k] += progress[k].count(hitme.HitMeStatus.COMPLETE)
 
+    all_tas = hitmeconfig.get_tas()
+
+    # Fill in any TAs who haven't started from roster of TAs
+    for grader in all_tas - set(all_progress.keys()):
+        all_progress[grader] = 0
+
     # Sort in increasing order of total submissions completed
     # If UTLNs tie on total submissions completed, then those
     # are sorted by TA UTLN
     graders, graders_completed = misc.split_into_lists(
         sorted(all_progress.items(), key=lambda e: e[1])
     )
+
+    misc.separator(f"Progress per TA for {assignment}")
+    print(f"There are {len(all_tas)} CS15 TAs\n")
 
     for grader, completed in zip(misc.left_justify_list(graders), graders_completed):
         # Prints something like:
