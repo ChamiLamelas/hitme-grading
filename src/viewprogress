@@ -12,7 +12,7 @@ Summer 2023 - Present
 from hitme import HitMeStatus, HitMeColumn, HitMeDatabase, HitMeException
 import misc
 import getpass
-from hitmeconfig import get_assignment, check_user_is_super_user
+from hitmeconfig import get_assignment, check_user_is_super_user, get_tas
 from collections import defaultdict, Counter
 
 DESCRIPTION = """
@@ -115,17 +115,21 @@ if __name__ == "__main__":
 
             # Converts into a dict[str, Counter[str]] (e.g.
             # "slamel01": { HitMeStatus.IN_PROGRESS: 1 })
-            # Note: ta_breakdown[USER][STATUS] will always return
-            # something (0 by default, in case a TA has no completed
-            # students)
             ta_breakdown = defaultdict(Counter)
             for (grader, status), count in flat_ta_breakdown.items():
                 ta_breakdown[grader][status] = count
+
+            all_tas = get_tas()
+
+            # Fill in any TAs who haven't started from roster of TAs
+            for grader in all_tas - set(ta_breakdown.keys()):
+                ta_breakdown[grader][HitMeStatus.IN_PROGRESS] = 0
 
             # Prints each TA's progress with TA names in blue followed
             # by their complete count in green and in progress count
             # in yellow
             misc.separator(f"Progress per TA for {assignment}")
+            print(f"There are {len(all_tas)} CS15 TAs")
 
             # Sort in increasing order of total submissions completed,
             # if graders tie on total submissions completed, then
@@ -141,6 +145,9 @@ if __name__ == "__main__":
             graders, graders_progress = misc.split_into_lists(
                 sorted(
                     ta_breakdown.items(),
+                    # Note: ta_breakdown[USER][STATUS] will always 
+                    # return something (0 by default, in case a TA 
+                    # has no completed students)
                     key=lambda e: (
                         e[1][HitMeStatus.COMPLETE],
                         -e[1][HitMeStatus.IN_PROGRESS],
