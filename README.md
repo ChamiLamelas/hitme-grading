@@ -469,6 +469,9 @@ Example log entry:
 
 ## Changelog
 
+### 5/10/2024
+- Made it so `viewprogress` and `totalprogress` will always show all the TAs. This is done by providing `hitme` with a roster file. The roster file can be provided in a variety of formats (CSV, Excel, text).
+
 ### 4/19/2024
 - Cleaned up help description for 0 argument commands (e.g. `hitme`, `viewprogress`)
 - Cleaned up tabular printing in `viewprogress`, `totalprogress`. 
