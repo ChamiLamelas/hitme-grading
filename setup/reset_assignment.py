@@ -117,7 +117,8 @@ def main():
             # reset script does the heavy lifting - script
             # invoked remote side, don't use os.path.join
             command = (
-                make_halligan_path(COURSEFOLDER, "staff-bin", "hitme", "src", "reset")
+                make_halligan_path(COURSEFOLDER,
+                                   "staff", "bin", "hitme", "src", "reset")
                 + " "
                 + args.assignment
             )
