@@ -156,7 +156,8 @@ def remote_run_hitme_setup(ssh, sftp, assignment, extensions):
     sftp.chmod(REMOTE_FILE, stat.S_IRWXU | stat.S_IRGRP)
 
     # Run setup command, then remove the zip file
-    command = make_halligan_path(COURSEFOLDER, "staff-bin", "hitme", "src", "setup")
+    command = make_halligan_path(COURSEFOLDER,
+                                 "staff", "bin", "hitme", "src", "setup")
     command += " " + assignment
     if len(extensions) > 0:
         command += " " + " ".join(extensions)
