@@ -3,10 +3,13 @@ File that wraps setup.py's execution so that the backup and
 hitme files are done in the name of cs15acc (the owner
 of /comp/15).
 
-The majority of work is done by staff-bin/hitme/src/setup.py
+The majority of work is done by staff/bin/hitme/src/setup.py
+
+NOTE: If you make any changes to this file make sure you
+recompile it by running `make setup` before pushing to the repo! 
 
 Author: Chami Lamelas (slamel01)
-Date: Fall 2023 - Spring 2024
+Date: Fall 2023 - Fall 2025
 */
 
 #include <stdio.h>
@@ -14,12 +17,13 @@ Date: Fall 2023 - Spring 2024
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <errno.h>
 
 int main(int argc, char *argv[]) {
-    
-    // SUID bit stuff.. don't know the details see the
+
+    // SUID bit stuff.. don't know all the details see the
     // 15 infra doc for what details I do know:
-    // https://docs.google.com/document/d/17dNXUSTioa-Kosv3lPU_y4k7kEo5IVVsrgTj80_0Yk8/edit#heading=h.emeweg40h6co
+    // staff/docs/infra/Infrastructure.md 
     setuid(geteuid());
     setgid(getegid());
     setreuid(geteuid(), geteuid());
@@ -54,22 +58,33 @@ int main(int argc, char *argv[]) {
     because we don't know length of this array of strings 
     till runtime
 
-    Then, just free the array (not the strings themselves
-    as they are just shallow copies of argv or literals).
+    In the case of a crash, just free the array (not the strings 
+    themselves as they are just shallow copies of argv or literals).
     */
-    char **exec_argv = malloc(argc + 1);
-    exec_argv[0] = "/comp/15/staff-bin/hitme/src/setup.sh";
+    char **exec_argv = malloc((argc + 1) * sizeof(char *)); 
+    if (exec_argv == NULL) {
+        perror("Simple malloc failed on Halligan, this is unexpected.\n");
+        return 1;
+    }
+
+    exec_argv[0] = "/comp/15/staff/bin/hitme/src/setup.sh"; 
     for (int i = 1; i < argc; i++) {
         exec_argv[i] = argv[i];
     }
     exec_argv[argc] = NULL;
 
-    int exit_code = 0;
+    // Execute the setup.sh script with above arguments
     if (execvp(exec_argv[0], exec_argv) < 0) {
-        perror("execvp error (aborting) - wait a minute before rerunning");
-        exit_code = 1;
+        fprintf(stderr, "execvp error running %s: %s\n", exec_argv[0], strerror(errno));
+        fprintf(stderr, "If this happens just once, try waiting a couple of minutes and rerunning.\n");
+        free(exec_argv);
+        return 1;
     }
 
-    free(exec_argv);
-    return exit_code;
+    // Don't free exec_argv here because this code would be unreachable since
+    // execvp replaces the current process code with the new process code (i.e.
+    // running setup.sh ...). All allocated memory is freed when bash process ends.
+    // See: https://linux.die.net/man/3/execvp
+    return 0;
 }
+
