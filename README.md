@@ -469,6 +469,9 @@ Example log entry:
 
 ## Changelog
 
+### 9/20/2024 
+- Update `setup.c` to better report errors with `execvp` and update call to `malloc` for better stability. 
+
 ### 5/10/2024
 - Made it so `viewprogress` and `totalprogress` will always show all the TAs. This is done by providing `hitme` with a roster file. The roster file can be provided in a variety of formats (CSV, Excel, text).
 
