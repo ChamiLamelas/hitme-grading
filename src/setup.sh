@@ -9,4 +9,4 @@
 export PATH=/usr/sup/bin:$PATH
 export LD_LIBRARY_PATH=/usr/sup/lib64:/usr/sup/lib:${LD_LIBRARY_PATH}
 
-python3 /comp/15/staff-bin/hitme/src/setup.py $@
+python3 /comp/15/staff/bin/hitme/src/setup.py $@
