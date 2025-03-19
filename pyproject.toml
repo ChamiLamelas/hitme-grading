@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tufts-grading-assignment-utility"
+version = "9.20.2024"
+description = "Grading assignment utility known as 'hitme' that is used by Tufts University course COMP 15 staff members. Written from scratch to replace an old variant of the system that works with Gradescope submission data."
+readme = "README.md"
+authors = [{name = "Chami Lamelas"}]
+license = {file = "LICENSE"}
+requires-python = ">=3.9.2"
+
+dependencies = [
+    "paramiko>=3.4.0"
+]
+
+[project.urls]
+Repository = "https://github.com/ChamiLamelas/hitme-grading"
+Author = "https://sites.google.com/view/chami-lamelas"
